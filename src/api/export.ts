@@ -35,7 +35,7 @@ async function _export({
 	build_dir = '__sapper__/build',
 	export_dir = '__sapper__/export',
 	basepath = '',
-	timeout = 5000,
+	timeout = 500000,
 	oninfo = noop,
 	onfile = noop
 }: Opts = {}) {
@@ -117,19 +117,10 @@ async function _export({
 		if (seen.has(pathname)) return;
 		seen.add(pathname);
 
-		const timeout_deferred = new Deferred();
-		const the_timeout = setTimeout(() => {
-			timeout_deferred.reject(new Error(`Timed out waiting for ${url.href}`));
-		}, timeout);
-
-		const r = await Promise.race([
-			fetch(url.href, {
+		const r = await fetch(url.href, {
 				redirect: 'manual'
-			}),
-			timeout_deferred.promise
-		]);
+			})
 
-		clearTimeout(the_timeout); // prevent it hanging at the end
 
 		let type = r.headers.get('Content-Type');
 		let body = await r.text();
@@ -142,7 +133,7 @@ async function _export({
 
 				const cleaned = clean_html(body);
 
-				const q = yootils.queue(8);
+				const q = yootils.queue(1);
 				let promise;
 
 				const base_match = /<base ([\s\S]+?)>/m.exec(cleaned);
@@ -160,7 +151,7 @@ async function _export({
 						const url = resolve(base.href, href);
 
 						if (url.protocol === protocol && url.host === host) {
-							urls.push(url);
+							promise = q.add(() => handle(url));
 						}
 					}
 				}
